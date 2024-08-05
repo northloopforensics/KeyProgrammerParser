@@ -6,6 +6,10 @@ Parses full file system extractions with a focus on VIN recovery.
 
 The tool ingests the full file system as a folder.  The first step to process the extraction is to unzip the full file system extraction to a folder on your computer. 
 
+The next step is to create a folder where the report will be stored.
+
+Next, open a command prompt where you have saved the KeyProgrammerParser.exe file and enter the command below to call the executable and point it at the file paths of the extraction folder and your report folder.
+
 ---
 <b>Sample usage - keyprogrammerparser.exe extraction_folder report_folder</b>
 
