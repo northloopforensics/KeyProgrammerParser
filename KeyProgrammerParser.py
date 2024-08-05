@@ -128,7 +128,7 @@ def parse_vinhistory_db(vinhistory_db, report_file):
 
 def make_report_header(reportfile):
     with open(reportfile, 'w') as f:
-        f.write(f"Key Programmer Report\nDate: {now.strftime('%Y-%m-%d %H:%M:%S')}\n\n\n")
+        f.write(f"KeyProgrammerParser Report\nDate: {now.strftime('%Y-%m-%d %H:%M:%S')}\n\n\n")
 
 def lookup_and_report_vins(vins, reportfile):
     with open(reportfile, 'a') as f:
@@ -154,7 +154,7 @@ def report_hits(reportfile):
             f.write(f"\t{hit}\n\n")
 
 def main():
-    parser = argparse.ArgumentParser(description='''Key Programmer Parser (Autel KM100). This tool parses the Autel Key Programmer (KM100) vinhistory.db file, 
+    parser = argparse.ArgumentParser(description='''KeyProgrammerParser (Autel KM100). This tool parses the Autel Key Programmer (KM100) vinhistory.db file, 
                         extracts VINs from log files, and copies of photographs taken to scan VINs. To create the extraction directory,
                         unzip the full file system extraction from the Autel Key Programmer (KM100) to a directory on your computer. 
                         If working on a Mac or Linux system, you may need to change the permissions on the extraction files to read/write. 
@@ -167,7 +167,7 @@ def main():
 
     extraction_directory = args.extraction_directory
     report_directory = args.report_directory
-    report_file = os.path.join(report_directory, ('Programmer_Parser_Report_' + str(now.strftime('%Y%m%d%H%M%S')) + '.txt'))
+    report_file = os.path.join(report_directory, ('KeyProgrammerParser_Report_' + str(now.strftime('%Y%m%d%H%M%S')) + '.txt'))
 
     log_files = find_log_files(extraction_directory)
     print(" ")
