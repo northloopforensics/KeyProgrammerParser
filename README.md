@@ -5,16 +5,19 @@ Supports - Autel KM100
 Parses full file system extractions with a focus on VIN recovery.
 
 
+---
 <b>Sample usage - keyprogrammerparser.exe extraction_folder report_folder</b>
 
+---
 
-1.Parses log records for VINs
+1.  Parses log records for VINs
 
+2.  Parses vinhistory.db
 
-2.Parses vinhistory.db
+3.  Copies photos of VINs taken by handset
 
-3.Copies photos of VINs taken by handset
+4.  If online, will query each VIN for detailed vehicle information using the NHTSA API.
 
-4.If online, will query each VIN for detailed vehicle information.
+5.  If offline, will provide manufacturer information. 
 
-5.If offline, will provide manufacturer information. 
+Report output will include a summary of VINs found with vehicle data, results from the vinhistory.db file, each instance a VIN was found and the corresponding log file it was found in, and JPGs taken with the AUTOVIN function that get OCRd for VIN lookups.
