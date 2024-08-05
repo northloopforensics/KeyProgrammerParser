@@ -11,7 +11,10 @@ The next step is to create a folder where the report will be stored.
 Next, open a command prompt where you have saved the KeyProgrammerParser.exe file and enter the command below to call the executable and point it at the file paths of the extraction folder and your report folder.
 
 ---
-<b>Sample usage - keyprogrammerparser.exe extraction_folder report_folder</b>
+<b>Sample usage - KeyProgrammerParser.exe extraction_folder report_folder</b>
+
+---
+![Alt text](https://github.com/user-attachments/assets/7eaba52f-d857-4391-a04c-92b200b6956c)
 
 ---
 
