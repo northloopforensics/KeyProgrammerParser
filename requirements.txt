@@ -1,0 +1,3 @@
+chardet==5.1.0
+vininfo==1.8.0
+pyvin==0.0.2
