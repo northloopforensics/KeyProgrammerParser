@@ -127,20 +127,20 @@ def parse_vinhistory_db(vinhistory_db, report_file):
     else:
         try:
             conn = sqlite3.connect(vinhistory_db)
+            c = conn.cursor()
+            c.execute("SELECT * FROM RECOG_RESULT")
+            with open(report_file, 'a') as f:
+                f.write("****************************************************************************************\n\n")
+                f.write("VIN History from data/media/0/Scan/database/vinhistory.db:\n*Note DB used to OCR VIN Photos\n\n")
+            column_names = [description[0] for description in c.description]
+            rows = c.fetchall()
+            table = format_table(column_names, rows)    
+            conn.close()
+            with open(report_file, 'a') as f:
+                f.write(table)
+                f.write("\n\n")
         except Exception as e:
             print(f"Error connecting to vinhistory.db: {e}")
-        c = conn.cursor()
-        c.execute("SELECT * FROM RECOG_RESULT")
-        with open(report_file, 'a') as f:
-            f.write("****************************************************************************************\n\n")
-            f.write("VIN History from data/media/0/Scan/database/vinhistory.db:\n*Note DB used to OCR VIN Photos\n\n")
-        column_names = [description[0] for description in c.description]
-        rows = c.fetchall()
-        table = format_table(column_names, rows)    
-        conn.close()
-        with open(report_file, 'a') as f:
-            f.write(table)
-            f.write("\n\n")
 
 def make_report_header(reportfile):
     with open(reportfile, 'w') as f:
