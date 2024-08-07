@@ -12,7 +12,7 @@ import argparse
 ################## GLOBAL VARIABLES ##################
 results_list = []
 hit_list = []
-vinhistory_db = []
+vinhistory_db = ""
 jpgs = []
 now = datetime.datetime.now()
 ################## FUNCTION VILLAGE ##################
@@ -66,18 +66,23 @@ def find_log_files(base_directory):
         if 'database' in root:
             for file in files:
                 if file.endswith('vinhistory.db'):
-                    vinhistory_db.append(os.path.join(root, file))
+                    global vinhistory_db
+                    vinhistory_db = os.path.join(root, file)
         if "DataLogging" in root:
             for file in files:
                 if file.endswith('.log'):
                     log_files.append(os.path.join(root, file))
                 elif file.endswith('.zip'):
                     zip_path = os.path.join(root, file)
-                    with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                        zip_ref.extractall(root)
-                        for name in zip_ref.namelist():
-                            if name.endswith('.log'):
-                                log_files.append(os.path.join(root, name))
+                    try:
+                        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                            zip_ref.extractall(root)
+                            for name in zip_ref.namelist():
+                                # if name.endswith('.log'):
+                                if file.endswith('.log'):
+                                    log_files.append(os.path.join(root, name))
+                    except Exception as e:
+                        print(f"Error extracting {zip_path}: {e}")
     return log_files
 
 def extract_vins(log_files):
@@ -91,9 +96,10 @@ def extract_vins(log_files):
                 found_vins = vin_pattern.findall(contents)
                 for vin in found_vins:
                     try:
-                        if Vin(vin).verify_checksum() == True:
-                            vins.add(vin)
-                            hit_list.append(f"VIN: {vin}, File: {log_file}")
+                        if Vin(vin).verify_checksum() == True:      # Check if VIN is valid
+                            if vin.isdigit() == False:              # Check if VIN is all digits; to screen out false positives
+                                vins.add(vin)
+                                hit_list.append(f"VIN: {vin}, File: {log_file}")
                     except Exception as e:
                         print(f"Error parsing VIN {vin}: {e}")
         except Exception as e:
@@ -112,19 +118,29 @@ def format_table(column_names, results):
     return table
 
 def parse_vinhistory_db(vinhistory_db, report_file):
-    conn = sqlite3.connect(vinhistory_db[0])
-    c = conn.cursor()
-    c.execute("SELECT * FROM RECOG_RESULT")
-    with open(report_file, 'a') as f:
-        f.write("****************************************************************************************\n\n")
-        f.write("VIN History from data/media/0/Scan/database/vinhistory.db:\n*Note DB used to OCR VIN Photos\n\n")
-    column_names = [description[0] for description in c.description]
-    rows = c.fetchall()
-    table = format_table(column_names, rows)    
-    conn.close()
-    with open(report_file, 'a') as f:
-        f.write(table)
-        f.write("\n\n")
+    if vinhistory_db == "":
+        print("No vinhistory.db found.")
+        with open(report_file, 'a') as f:
+            f.write("****************************************************************************************\n\n")
+            f.write("VIN History from data/media/0/Scan/database/vinhistory.db:\n*Note DB used to OCR VIN Photos\n\n")
+            f.write("No vinhistory.db found.\n\n")
+    else:
+        try:
+            conn = sqlite3.connect(vinhistory_db)
+        except Exception as e:
+            print(f"Error connecting to vinhistory.db: {e}")
+        c = conn.cursor()
+        c.execute("SELECT * FROM RECOG_RESULT")
+        with open(report_file, 'a') as f:
+            f.write("****************************************************************************************\n\n")
+            f.write("VIN History from data/media/0/Scan/database/vinhistory.db:\n*Note DB used to OCR VIN Photos\n\n")
+        column_names = [description[0] for description in c.description]
+        rows = c.fetchall()
+        table = format_table(column_names, rows)    
+        conn.close()
+        with open(report_file, 'a') as f:
+            f.write(table)
+            f.write("\n\n")
 
 def make_report_header(reportfile):
     with open(reportfile, 'w') as f:
