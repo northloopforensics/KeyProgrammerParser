@@ -1,14 +1,12 @@
 # KeyProgrammerParser
 
-Supports - Autel KM100
-
-Parses full file system extractions with a focus on VIN recovery.
+Currently Supports - Autel KM100
 
 The tool ingests the full file system as a folder.  The first step to process the extraction is to unzip the full file system extraction to a folder on your computer. 
 
 The next step is to create a folder where the report will be stored.
 
-Next, open a command prompt where you have saved the KeyProgrammerParser.exe file and enter the command below to call the executable and point it at the file paths of the extraction folder and your report folder.
+For version 1, open a command prompt where you have saved the KeyProgrammerParser.exe file and enter the command below to call the executable and point it at the file paths of the extraction folder and your report folder.
 
 ---
 <b>Sample usage - KeyProgrammerParser.exe extraction_folder report_folder</b>
@@ -17,8 +15,12 @@ Next, open a command prompt where you have saved the KeyProgrammerParser.exe fil
 ![Alt text](https://github.com/user-attachments/assets/7eaba52f-d857-4391-a04c-92b200b6956c)
 
 ---
+For version 2, use the GUI to identify the extraction and report folders.  Hit Run Parser or reference the Help button.
+![Alt text](https://github.com/user-attachments/assets/f0639d20-5f66-4810-9301-8b48af21fece)
 
-1.  Parses log records for VINs
+---
+
+1.  Parses log records for VINs and user details
 
 2.  Parses vinhistory.db
 
