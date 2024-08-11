@@ -9,13 +9,9 @@ import sqlite3
 import platform
 import tkinter as tk
 from tkinter import filedialog, messagebox
-from tkinter import ttk  # Import ttk for Progressbar
-import threading  # Import threading for running tasks in background
-
-# NOt working
-# user details
-# progress bar
-
+from tkinter import ttk  
+import threading  
+import textwrap
 
 ################## GLOBAL VARIABLES ##################
 results_list = []
@@ -31,7 +27,7 @@ address = ""
 state = ""
 country = ""
 
-################## FUNCTION VILLAGE ##################
+################## FUNCTION SOUP ##################
 
 def detect_operating_system():
     os_name = os.name
@@ -129,7 +125,6 @@ def extract_vins(log_files, progress_bar):
        
 def extract_user_data(log_files, progress_bar, total_steps):
     global nickname, email, phone, address, city, state, country
-    
     # Regular expressions to match the fields
     nickname_regex = re.compile(r'"nickname":"(.*?)"')
     email_regex = re.compile(r'"email":"(.*?)"')
@@ -145,43 +140,36 @@ def extract_user_data(log_files, progress_bar, total_steps):
             encoding = detect_encoding(log_file)
             with open(log_file, 'r', encoding=encoding, errors='ignore') as file:
                 contents = file.read()
-
                 if not nickname:
                     nickname_match = nickname_regex.search(contents)
                     if nickname_match:
                         nickname = nickname_match.group(1)
-                        print(f"Nickname: {nickname}")
-                
+                        print(f"Nickname: {nickname}")   
                 if not email:
                     email_match = email_regex.search(contents)
                     if email_match:
                         email = email_match.group(1)
-                        print(f"Email: {email}")
-                
+                        print(f"Email: {email}")   
                 if not phone:
                     phone_match = phone_regex.search(contents)
                     if phone_match:
                         phone = phone_match.group(1)
                         print(f"Phone: {phone}")
-                
                 if not address:
                     address_match = address_regex.search(contents)
                     if address_match:
                         address = address_match.group(1)
                         print(f"Address: {address}")
-                
                 if not city:
                     city_match = city_regex.search(contents)
                     if city_match:
                         city = city_match.group(1)
                         print(f"City: {city}")
-                
                 if not state:
                     state_match = state_regex.search(contents)
                     if state_match:
                         state = state_match.group(1)
                         print(f"State: {state}")
-                
                 if not country:
                     country_match = country_regex.search(contents)
                     if country_match:
@@ -190,7 +178,8 @@ def extract_user_data(log_files, progress_bar, total_steps):
                 
                 # Check if all values have been found
                 if nickname and email and phone and address and city and state and country:
-                    break  # Exit the loop if all details are found
+                    detail_source = log_file # Save the log file where the details were found   
+                    break  # Exit the loop if all details are found to save time
 
         except Exception as e:
             print(f"Error reading {log_file}: {e}")
@@ -198,8 +187,7 @@ def extract_user_data(log_files, progress_bar, total_steps):
         progress_bar.step(1)  # Update progress bar after processing each file
         progress_bar.update()
     
-    return nickname, email, phone, address, city, state, country
-
+    return nickname, email, phone, address, city, state, country, detail_source
 
 def format_table(column_names, results):
     results = [[item if item is not None else '' for item in row] for row in results]
@@ -213,7 +201,6 @@ def format_table(column_names, results):
     return table
 
 def parse_vinhistory_db(vinhistory_db, report_file, progress_bar):
-
     if vinhistory_db == "":
         print("No vinhistory.db found.")
         with open(report_file, 'a') as f:
@@ -238,9 +225,10 @@ def parse_vinhistory_db(vinhistory_db, report_file, progress_bar):
         except Exception as e:
             print(f"Error connecting to vinhistory.db: {e}")
 
-def make_report_header(reportfile, nickname, email, phone, address, city, state, country):
+def make_report_header(reportfile, nickname, email, phone, address, city, state, country, detail_source):
     with open(reportfile, 'w') as f:
         f.write(f"KeyProgrammerParser Report\nDate: {now.strftime('%Y-%m-%d %H:%M:%S')}\n\n\n")
+        f.write("********************************************************************************************************************************************************************************\n\n")
         f.write("User Information:\n\n")
         f.write(f"\tUsername: {nickname}\n")
         f.write(f"\tEmail: {email}\n")
@@ -249,7 +237,7 @@ def make_report_header(reportfile, nickname, email, phone, address, city, state,
         f.write(f"\tCity: {city}\n")
         f.write(f"\tState: {state}\n")
         f.write(f"\tCountry: {country}\n\n")
-       
+        f.write(f"User data found in: {detail_source}\n\n")
 
 def lookup_and_report_vins(vins, reportfile, progress_bar, total_steps):
     step = total_steps / (len(vins) or 1)  # Avoid division by zero
@@ -278,36 +266,33 @@ def report_hits(reportfile):
         for hit in hit_list:
             f.write(f"\t{hit}\n\n")
 
-# def run_parser(extraction_directory, report_directory, progress_bar):
-#     def worker():
-#         try:
-#             log_files = find_log_files(extraction_directory)
-#             total_files = len(log_files)
-#             if vinhistory_db:
-#                 total_files += 1  # Add one more step for parsing the VIN history database
-#             total_files += len(jpgs) * 2  # Add steps for finding and copying JPGs
-            
-#             # Set total steps for the progress bar
-#             progress_bar['maximum'] = total_files
-#             progress_bar['value'] = 0  # Reset the progress bar
-            
-#             report_file = os.path.join(report_directory, ('KeyProgrammerParser_Report_' + str(now.strftime('%Y%m%d%H%M%S')) + '.txt'))
-#             vins = extract_vins(log_files, progress_bar)
-#             nickname, email, phone, address, city, state, country = extract_user_data(log_files, progress_bar, total_files)
-#             make_report_header(report_file, nickname, email, phone, address, city, state, country)
-#             lookup_and_report_vins(vins, report_file, progress_bar, total_files)
-#             parse_vinhistory_db(vinhistory_db, report_file, progress_bar)
-#             report_hits(report_file)
-#             find_scan_jpegs(extraction_directory, progress_bar)
-#             copy_jpegs(jpgs, report_directory, progress_bar)
-            
-#             progress_bar['value'] = total_files  # Complete the progress bar
-#             messagebox.showinfo("Completed", f"Report was written to {report_file}\n\nFound {len(jpgs)} scanned VIN jpgs.")
-#         except Exception as e:
-#             print(f"An error occurred: {e}")
-#             messagebox.showerror("Error", f"An error occurred while processing. Check the console for details. {e}")
+def show_help():    # To format the help text window
+    help_text = textwrap.dedent("""
+        Key Programmer Parser v2.0
+        -------------------------------------------------------------------
+        This program parses data from full file system extractions of Autel Key Programmers. 
+        (Currently supports: KM100)
 
-#     threading.Thread(target=worker, daemon=True).start()
+        Steps:
+        1. Unzip the full file system extraction to a folder on your computer.
+        2. Select the folder where the extraction was unzipped.
+        3. Select a folder to save the report.
+        4. Click Run.
+        5. The report will be saved to the folder you selected.
+        6. JPEGs of the scan images will be copied to the report folder.
+
+        Artifacts parsed:
+        - User data (nickname, email, phone, address, city, state, country)
+        - VINs from log files
+        - VINs from vinhistory.db
+        - If online, VINs are run on the NHTSA API for detailed information.
+        - If offline, basic VIN decoding will provide the manufacturer.
+
+        © 2024 North Loop Consulting, LLC. All rights reserved.
+    """)
+    messagebox.showinfo("Help", help_text)
+
+################## MAIN FUNCTION ##################
 def run_parser(extraction_directory, report_directory, progress_bar):
     def worker():
         try:
@@ -322,22 +307,21 @@ def run_parser(extraction_directory, report_directory, progress_bar):
 
             report_file = os.path.join(report_directory, ('KeyProgrammerParser_Report_' + str(now.strftime('%Y%m%d%H%M%S')) + '.txt'))
             vins = extract_vins(log_files, progress_bar)
-            nickname, email, phone, address, city, state, country = extract_user_data(log_files, progress_bar, total_steps)
-            make_report_header(report_file, nickname, email, phone, address, city, state, country)
+            nickname, email, phone, address, city, state, country, detail_source = extract_user_data(log_files, progress_bar, total_steps)
+            make_report_header(report_file, nickname, email, phone, address, city, state, country, detail_source)
             lookup_and_report_vins(vins, report_file, progress_bar, total_steps)
             parse_vinhistory_db(vinhistory_db, report_file, progress_bar)
             report_hits(report_file)
             find_scan_jpegs(extraction_directory, progress_bar)
             copy_jpegs(jpgs, report_directory, progress_bar)
-
             progress_bar['value'] = total_steps  # Complete the progress bar
+
             messagebox.showinfo("Completed", f"Report was written to {report_file}\n\nFound {len(jpgs)} scanned VIN jpgs.")
         except Exception as e:
             print(f"An error occurred: {e}")
             messagebox.showerror("Error", f"An error occurred while processing. Check the console for details. {e}")
 
     threading.Thread(target=worker, daemon=True).start()
-
 
 ################## GUI SETUP ##################
 def browse_directory(entry): 
@@ -355,7 +339,7 @@ def run_parser_gui():
     run_parser(extraction_directory, report_directory, progress_bar)
 
 app = tk.Tk()
-app.title("Key Programmer Parser - North Loop Consulting, LLC")
+app.title("Key Programmer Parser v2.0 - North Loop Consulting, LLC")
 
 # Main Frame
 main_frame = tk.Frame(app, padx=10, pady=10)
@@ -391,20 +375,6 @@ buttons_frame = tk.Frame(main_frame, padx=10, pady=10)
 buttons_frame.grid(row=3, column=0, padx=10, pady=10, sticky='ew')
 
 tk.Button(buttons_frame, text="Run Parser",activeforeground='orange',command=run_parser_gui).pack(side='left', padx=5)
-tk.Button(buttons_frame, text="Help", activeforeground='orange',command=lambda: messagebox.showinfo("Help", """
-                        This program parses data from full file system extractions of Autel Key Programmers 
-                        (Currently supports: KM100).\n\n
-                        1. Unzip the full file system extraction to a folder on your computer.\n
-                        2. Select the folder where the extraction was unzipped.\n
-                        3. Select a folder to save the report.\n
-                        4. Click Run.\n
-                        5. The report will be saved to the folder you selected.\n
-                        6. JPEGs of the scan images will be copied to the report folder.\n\n\n
-                        Artifacts parsed:\n
-                        - VINs from log files\n
-                        - VINs from vinhistory.db\n
-                        - If online, VINs are run on the NHTSA API for detailed information. If offline, basic VIN 
-                        decoding will provide the manufacturer.\n\n
-                        © 2024 North Loop Consulting, LLC. All rights reserved.""")).pack(side='left', padx=5)
+tk.Button(buttons_frame, text="Help", activeforeground='orange', command=show_help).pack(side='left', padx=5) # see show help function above, only way to format the text decently
 
 app.mainloop()
