@@ -466,7 +466,7 @@ root.title("KeyProgrammerParser v2.1")
 root.geometry("840x620")
 
 # Styling
-label_font = ('Arial', 12)
+label_font = ('Arial', 10)
 
 # Frame for directory selection
 directory_frame = ctk.CTkFrame(root)
