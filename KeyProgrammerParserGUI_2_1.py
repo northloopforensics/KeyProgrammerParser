@@ -8,19 +8,14 @@ import pyvin
 import datetime
 import sqlite3
 import platform
-import tkinter as tk
-from tkinter import filedialog, messagebox
-from tkinter import ttk
+import customtkinter as ctk
 import threading
 import textwrap
 import json
-import logging
 from tkinter.scrolledtext import ScrolledText
+import tkinter.messagebox as tkMessageBox
 
-# Configure logging
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
-# Set logging level for chardet to WARNING to reduce verbosity
-logging.getLogger('chardet').setLevel(logging.WARNING)
+
 
 # Global variables
 hit_list = []
@@ -61,39 +56,38 @@ opsys = detect_operating_system()
 
 # Function to find JPEG files
 def find_scan_jpegs(base_directory, progress_bar):
-    logging.debug(f"Finding JPEGs in {base_directory}")
+    print(f"Finding JPEGs in {base_directory}")
     for root, dirs, files in os.walk(base_directory):
         if 'SmartDecode' in root:
             for file in files:
                 if file.endswith('.jpg'):
                     jpgs.append(os.path.join(root, file))
-                    progress_bar.step(1)
-                    progress_bar.update()
-    logging.debug(f"Found {len(jpgs)} JPEGs")
+                    
+    
 
 # Function to copy JPEG files
 def copy_jpegs(jpgs_list, report_dir, progress_bar):
-    logging.debug(f"Copying JPEGs to {report_dir}")
+    if len(jpgs_list) > 0:
+        print(f"Copying JPEGs to {report_dir}")
     for jpg in jpgs_list:
         try:
             if not os.path.exists(report_dir):
                 os.makedirs(report_dir)
         except Exception as e:
-            logging.error(f"Error making report directory: {e}")
+            print(f"Error making report directory: {e}")
         try:
             if opsys == 'Mac' or opsys == 'Linux':
                 os.system(f'cp "{jpg}" "{report_dir}"')
             elif opsys == 'Windows':
                 os.system(f'copy "{jpg}" "{report_dir}"')
         except Exception as e:
-            logging.error(f'Error copying "{jpg}" to report directory: "{e}"')
-        progress_bar.step(1)
-        progress_bar.update()
-    logging.debug("Finished copying JPEGs")
+            print(f'Error copying "{jpg}" to report directory: "{e}"')
+        
+    
 
 # Function to find log files
 def find_log_files(base_directory):
-    logging.debug(f"Finding log files in {base_directory}")
+    print(f"Finding log files in {base_directory}")
     log_files = []
     json_files = []
     for root, dirs, files in os.walk(base_directory):
@@ -111,7 +105,7 @@ def find_log_files(base_directory):
                                 if name.endswith('.log'):
                                     log_files.append(os.path.join(root, name))
                     except Exception as e:
-                        logging.error(f"Error extracting {zip_path}: {e}")
+                        print(f"Error extracting {zip_path}: {e}")
         if 'database' in root:
             for file in files:
                 if file.endswith('vinhistory.db'):
@@ -121,6 +115,7 @@ def find_log_files(base_directory):
             for file in files:
                 if file.endswith('.json'):
                     json_path = os.path.join(root, file)
+                    json_files.append(json_path)
                     try:
                         with open(json_path, 'r') as json_file:
                             print(f"Parsing {json_path}...")
@@ -130,15 +125,15 @@ def find_log_files(base_directory):
                             if vin != "VehicleVIN not found":
                                 hit_list.append(f"VIN: {vin}, File: {json_path}")
                     except Exception as e:
-                        logging.error(f"Error reading {json_path}: {e}")
+                        print(f"Error reading {json_path}: {e}")
 
         
-    logging.debug(f"Found {len(log_files)} log files and {len(json_files)} JSON files")
+    print(f"Found {len(log_files)} log files and {len(json_files)} JSON files")
     return log_files, json_files
 
 # Function to extract VINs
 def extract_vins(log_files, progress_bar):
-    logging.debug("Extracting VINs")
+    print("Extracting VINs")
     vins = set()
     vin_pattern = re.compile(r'\b([A-HJ-NPR-Z0-9]{17})\b')
     for log_file in log_files:
@@ -154,12 +149,11 @@ def extract_vins(log_files, progress_bar):
                                 vins.add(vin)
                                 hit_list.append(f"VIN: {vin}, File: {log_file}")
                     except Exception as e:
-                        logging.error(f"Error parsing VIN {vin}: {e}")
+                        print(f"Error parsing VIN {vin}: {e}")
         except Exception as e:
-            logging.error(f"Error reading {log_file}: {e}")
-        progress_bar.step(1)
-        progress_bar.update()
-    logging.debug(f"Extracted {len(vins)} VINs")
+            print(f"Error reading {log_file}: {e}")
+        
+    print(f"Extracted {len(vins)} VINs")
     return vins
 
 # Function to extract user data
@@ -241,15 +235,10 @@ def extract_user_data(log_files, progress_bar, total_steps):
                     if passwrd_match:
                         passwrd = passwrd_match.group(1)
 
-                # # Check if all user data is found
-                # if nickname and email and phone and address and city and state and country:
-                #     detail_source = log_file
-                #     break
+               
         except Exception as e:
-            logging.error(f"Error reading {log_file}: {e}")
-        progress_bar.step(1)
-        progress_bar.update()
-    print(version, Product, Sub_product, dev_serial, passwrd)
+            print(f"Error reading {log_file}: {e}")
+        
     return nickname, email, phone, address, city, state, country, detail_source, version, Product, Sub_product, dev_serial, passwrd
 
 
@@ -269,7 +258,7 @@ def extract_json_clouddata(json_data, file_path):
 
 # Function to extract SSIDs
 def extract_SSIDs(log_files, progress_bar):
-    logging.debug("Extracting SSIDs")
+    print("Extracting SSIDs")
     SSIDs = set()
     SSID_pattern = re.compile(r'\b([A-HJ-NPR-Z0-9]{17})\b')
     for log_file in log_files:
@@ -284,12 +273,11 @@ def extract_SSIDs(log_files, progress_bar):
                             SSIDs.add(SSID)
                             hit_list.append(f"SSID: {SSID}, File: {log_file}")
                     except Exception as e:
-                        logging.error(f"Error parsing SSID {SSID}: {e}")
+                        print(f"Error parsing SSID {SSID}: {e}")
         except Exception as e:
-            logging.error(f"Error reading {log_file}: {e}")
+            print(f"Error reading {log_file}: {e}")
         progress_bar.step(1)
         progress_bar.update()
-    logging.debug(f"Extracted {len(SSIDs)} SSIDs")
     return SSIDs
 
 # Function to format table
@@ -306,9 +294,7 @@ def format_table(column_names, results):
 
 # Function to parse VIN history database
 def parse_vinhistory_db(vinhistory_db, report_file, progress_bar):
-    logging.debug("Parsing VIN history database")
     if vinhistory_db == "":
-        logging.debug("No vinhistory.db found.")
         with open(report_file, 'a') as f:
             f.write("********************************************************************************************************************************************************************************\n\n")
             f.write("VIN History from data/media/0/Scan/database/vinhistory.db:\n*Note DB used to OCR VIN Photos\n\n")
@@ -329,14 +315,13 @@ def parse_vinhistory_db(vinhistory_db, report_file, progress_bar):
                 f.write(table)
                 f.write("\n\n")
         except Exception as e:
-            logging.error(f"Error connecting to vinhistory.db: {e}")
+            print(f"Error connecting to vinhistory.db: {e}")
 
 # Function to make report header
 def make_report_header(reportfile, nickname, email, phone, address, city, state, country, detail_source, version, Product, Sub_product, dev_serial, passwrd):
     if len(nickname) == 0 and len(email) == 0 and len(phone) == 0 and len(address) == 0 and len(city) == 0 and len(state) == 0 and len(country) == 0:
         with open(reportfile, 'w') as f:
             f.write(f"KeyProgrammerParser Report\nDate: {now.strftime('%Y-%m-%d %H:%M:%S')}\n\n\n")
-            f.write("********************************************************************************************************************************************************************************\n\n")
             f.write("Device Information:\n\n")
             f.write(f"\tOS: {version}\n")
             f.write(f"\tProduct: {Product}\n")
@@ -344,11 +329,9 @@ def make_report_header(reportfile, nickname, email, phone, address, city, state,
             f.write(f"\tSerial Number: {dev_serial}\n")
             f.write(f"\tPassword: {passwrd}\n\n")
             f.write("User Information: No Registered User Found\n\n")
-            f.write("********************************************************************************************************************************************************************************\n\n")
     else:
         with open(reportfile, 'w') as f:
             f.write(f"KeyProgrammerParser Report\nDate: {now.strftime('%Y-%m-%d %H:%M:%S')}\n\n\n")
-            f.write("********************************************************************************************************************************************************************************\n\n")
             f.write("Device Information:\n\n")
             f.write(f"\tOS: {version}\n")
             f.write(f"\tProduct: {Product}\n")
@@ -366,13 +349,11 @@ def make_report_header(reportfile, nickname, email, phone, address, city, state,
             f.write(f"\tState: {state}\n")
             f.write(f"\tCountry: {country}\n")
             f.write(f"\tSource File: {detail_source}\n\n")
-            f.write("********************************************************************************************************************************************************************************\n\n")
 
 # Function to lookup and report VINs
 def lookup_and_report_vins(vins, reportfile):
     
     with open(reportfile, 'a') as f:
-        f.write("********************************************************************************************************************************************************************************\n\n")
         f.write("VIN Summary:\n\n")
     for vin in vins:
         try:
@@ -389,26 +370,26 @@ def lookup_and_report_vins(vins, reportfile):
 def report_sources(hit_list, reportfile):
     try:
         with open(reportfile, 'a') as f:
-            f.write("********************************************************************************************************************************************************************************\n\n")
             f.write("Sources:\n\n")
             for hit in hit_list:
                 f.write(f"\t{hit}\n")
             f.write("\n\n")
     except Exception as e:
-        logging.error(f"Error writing sources to report: {e}")
-    
+        print("Report Sources Error")
 
 # Function to run parser
 def run_parser(base_directory, report_file, progress_bar):
-    logging.debug("Running parser")
+    
     global jpgs, vinhistory_db
     jpgs = []
     log_files, json_files = find_log_files(base_directory)
-    total_steps = len(log_files) + 100
-    progress_bar.config(maximum=total_steps)
+    total_steps = len(log_files)
+    progress_bar.set(0)  # Reset to 0 before starting
+    progress_bar.max = total_steps  # Set the max directly
+    # progress_bar.configure(maximum=total_steps)
     find_scan_jpegs(base_directory, progress_bar)
     copy_jpegs(jpgs, os.path.join(base_directory, 'Reports'), progress_bar)
-    print("Length of log files: ", len(log_files))
+    # print("Log files found: ", len(log_files))
     vins = extract_vins(log_files, progress_bar)
     extract_user_data(log_files, progress_bar, total_steps)
     make_report_header(report_file, nickname, email, phone, address, city, state, country, detail_source, version, Product, Sub_product, dev_serial, passwrd)
@@ -419,29 +400,26 @@ def run_parser(base_directory, report_file, progress_bar):
     else:
         with open(report_file, 'a') as f:
             f.write("No VINs found in the log files.\n\n")
-    logging.debug("Finished running parser")
   
-
 # GUI functionality
 def select_directory():
-    directory = filedialog.askdirectory()
-    directory_entry.delete(0, tk.END)
+    directory = ctk.filedialog.askdirectory()
+    directory_entry.delete(0, ctk.END)
     directory_entry.insert(0, directory)
 
 def select_report_file():
-    report_file = filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[("Text files", "*.txt")])
-    report_file_entry.delete(0, tk.END)
+    report_file = ctk.filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[("Text files", "*.txt")])
+    report_file_entry.delete(0, ctk.END)
     report_file_entry.insert(0, report_file)
 
 def validate_inputs(base_directory, report_file):
     if not os.path.isdir(base_directory):
-        messagebox.showerror("Error", "Invalid base directory. Please select a valid directory.")
+        ctk.messagebox.showerror("Error", "Invalid base directory. Please select a valid directory.")
         return False
     if not report_file:
-        messagebox.showerror("Error", "Please select a valid report file.")
+        ctk.messagebox.showerror("Error", "Please select a valid report file.")
         return False
     return True
-
 
 def start_parsing():
     base_directory = directory_entry.get()
@@ -452,26 +430,20 @@ def start_parsing():
 
     progress_bar.start()
 
-    # Define a callback for when the thread finishes
     def on_thread_complete():
         progress_bar.stop()
-        messagebox.showinfo("Processing Completed", "Report written to " + report_file)
-        start_button.config(state=tk.NORMAL)
+        tkMessageBox.showinfo("Processing Completed", "Report written to " + report_file)        
+        start_button.configure(state=ctk.NORMAL)
 
-    # Run the parser in a new thread
     def run_in_thread():
         try:
             run_parser(base_directory, report_file, progress_bar)
         finally:
-            # Schedule the completion callback on the main thread
             root.after(0, on_thread_complete)
 
-    # Start the thread
     parse_thread = threading.Thread(target=run_in_thread)
     parse_thread.start()
-
-    # Disable the start button to prevent multiple clicks
-    start_button.config(state=tk.DISABLED)
+    start_button.configure(state=ctk.DISABLED)
 
 # Redirect stdout and stderr to the console
 class ConsoleLogger:
@@ -479,40 +451,67 @@ class ConsoleLogger:
         self.text_widget = text_widget
 
     def write(self, message):
-        self.text_widget.insert(tk.END, message)
-        self.text_widget.see(tk.END)
+        self.text_widget.insert(ctk.END, message)
+        self.text_widget.see(ctk.END)
 
     def flush(self):
         pass
 
 # GUI setup
-root = tk.Tk()
-root.title("KeyProgrammerParser")
+ctk.set_appearance_mode("System")  # Modes: "System" (default), "Dark", "Light"
+ctk.set_default_color_theme("blue")  # Themes: "blue" (default), "green", "dark-blue", etc.
 
-directory_label = tk.Label(root, text="Select base directory:")
-directory_label.pack()
-directory_entry = tk.Entry(root, width=50)
-directory_entry.pack()
-directory_button = tk.Button(root, text="Browse", command=select_directory)
-directory_button.pack()
+root = ctk.CTk()
+root.title("KeyProgrammerParser v2.1")
+root.geometry("840x620")
 
-report_file_label = tk.Label(root, text="Select report file:")
-report_file_label.pack()
-report_file_entry = tk.Entry(root, width=50)
-report_file_entry.pack()
-report_file_button = tk.Button(root, text="Save As", command=select_report_file)
-report_file_button.pack()
+# Styling
+label_font = ('Arial', 12)
 
-progress_bar = ttk.Progressbar(root, length=400, mode='determinate')
-progress_bar.pack()
+# Frame for directory selection
+directory_frame = ctk.CTkFrame(root)
+directory_frame.pack(pady=10)
 
-start_button = tk.Button(root, text="Start Parsing", command=start_parsing)
-start_button.pack()
+directory_label = ctk.CTkLabel(directory_frame, text="Folder containing extraction:", font=label_font)
+directory_label.pack(side=ctk.LEFT)
 
-# Console window
-console_label = tk.Label(root, text="Console Output:")
+directory_entry = ctk.CTkEntry(directory_frame, width=400)
+directory_entry.pack(side=ctk.LEFT, padx=5)
+
+directory_button = ctk.CTkButton(directory_frame, text="Browse", command=select_directory)
+directory_button.pack(side=ctk.LEFT)
+
+# Frame for report file selection
+report_frame = ctk.CTkFrame(root)
+report_frame.pack(pady=10)
+
+report_file_label = ctk.CTkLabel(report_frame, text="Select report file:", font=label_font)
+report_file_label.pack(side=ctk.LEFT)
+
+report_file_entry = ctk.CTkEntry(report_frame, width=400)
+report_file_entry.pack(side=ctk.LEFT, padx=5)
+
+report_file_button = ctk.CTkButton(report_frame, text="Save As", command=select_report_file)
+report_file_button.pack(side=ctk.LEFT)
+
+# Progress bar
+progress_bar = ctk.CTkProgressBar(root, width=400, mode='determinate')  # Set mode to 'determinate'
+progress_bar.pack(pady=10)  # Ensure it's visible
+progress_bar.set(0)  # Reset to 0 before starting
+
+
+# Start button
+start_button = ctk.CTkButton(root, text="Start Parsing", command=start_parsing)
+start_button.pack(pady=10)
+
+# Console output
+console_frame = ctk.CTkFrame(root)
+console_frame.pack(pady=10)
+
+console_label = ctk.CTkLabel(console_frame, text="", font=label_font)
 console_label.pack()
-console_text = ScrolledText(root, height=10, width=80)
+
+console_text = ScrolledText(console_frame, height=50, width=200, bg='#ffffff', font=('Arial', 20))
 console_text.pack()
 
 # Redirect stdout and stderr to the console
@@ -520,5 +519,5 @@ console_logger = ConsoleLogger(console_text)
 sys.stdout = console_logger
 sys.stderr = console_logger
 
+# Start the main loop
 root.mainloop()
- 
