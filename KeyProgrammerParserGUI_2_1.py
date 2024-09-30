@@ -400,6 +400,7 @@ def run_parser(base_directory, report_file, progress_bar):
     else:
         with open(report_file, 'a') as f:
             f.write("No VINs found in the log files.\n\n")
+    progress_bar.set(100)
   
 # GUI functionality
 def select_directory():
@@ -466,7 +467,7 @@ root.title("KeyProgrammerParser v2.1")
 root.geometry("840x620")
 
 # Styling
-label_font = ('Arial', 10)
+label_font = ('Arial', 12)
 
 # Frame for directory selection
 directory_frame = ctk.CTkFrame(root)
@@ -511,7 +512,7 @@ console_frame.pack(pady=10)
 console_label = ctk.CTkLabel(console_frame, text="", font=label_font)
 console_label.pack()
 
-console_text = ScrolledText(console_frame, height=50, width=200, bg='#ffffff', font=('Arial', 20))
+console_text = ScrolledText(console_frame, height=50, width=200, bg='#ffffff', font=('Arial', 10))
 console_text.pack()
 
 # Redirect stdout and stderr to the console
