@@ -1,0 +1,673 @@
+import chardet
+import os
+import sys
+import zipfile
+import tempfile
+import shutil
+import re
+from vininfo import Vin
+import pyvin
+import datetime
+import sqlite3
+import platform
+import customtkinter as ctk
+import threading
+import textwrap
+import json
+from tkinter import filedialog
+from tkinter.scrolledtext import ScrolledText
+import tkinter.messagebox as tkMessageBox
+from ipaddress import ip_address, IPv4Address, IPv6Address
+
+
+#wificonfigstore
+#log 'ConnectivityService' for wifi
+
+# Global variables
+hit_list = []
+vinhistory_db = ""
+jpgs = []
+now = datetime.datetime.now()
+nickname = ""
+email = ""
+phone = ""
+city = ""
+address = ""
+state = ""
+country = ""
+detail_source = ""
+version = ""
+Product = ""
+Sub_product = ""
+dev_serial = ""
+passwrd = ""
+#working on report for ssid
+
+# Function to detect operating system
+def detect_operating_system():
+    os_name = os.name
+    if os_name == 'posix':
+        system_name = platform.system()
+        if system_name == 'Darwin':
+            return 'Mac'
+        else:
+            return 'Linux'
+    elif os_name == 'nt':
+        return 'Windows'
+    else:
+        return 'Unknown'
+opsys = detect_operating_system()
+
+# Function to find JPEG files
+def find_scan_jpegs(base_directory, progress_bar):
+    print(f"Finding JPEGs in {base_directory}")
+    for root, dirs, files in os.walk(base_directory):
+        if 'SmartDecode' in root:
+            for file in files:
+                if file.endswith('.jpg'):
+                    jpgs.append(os.path.join(root, file))   
+
+# Function to copy JPEG files
+def copy_jpegs(jpgs_list, report_dir, progress_bar):
+    if len(jpgs_list) > 0:
+        print(f"Copying JPEGs to {report_dir}")
+    for jpg in jpgs_list:
+        try:
+            if not os.path.exists(report_dir):
+                os.makedirs(report_dir)
+        except Exception as e:
+            print(f"Error making report directory: {e}")
+        try:
+            if opsys == 'Mac' or opsys == 'Linux':
+                os.system(f'cp "{jpg}" "{report_dir}"')
+            elif opsys == 'Windows':
+                os.system(f'copy "{jpg}" "{report_dir}"')
+        except Exception as e:
+            print(f'Error copying "{jpg}" to report directory: "{e}"')
+        
+    
+# Function to find log files
+def find_log_files(base_directory):
+    print(f"Finding log files in {base_directory}")
+    log_files = []
+    json_files = []
+    for root, dirs, files in os.walk(base_directory):
+        if "DataLogging" in root:
+            for file in files:
+                if file.endswith('.log'):
+                    log_files.append(os.path.join(root, file))
+                elif file.endswith('.zip'):
+                    zip_path = os.path.join(root, file)
+                    try:
+                        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                            print(f"Extracting {zip_path}...")
+                            zip_ref.extractall(root)
+                            for name in zip_ref.namelist():
+                                if name.endswith('.log'):
+                                    log_files.append(os.path.join(root, name))
+                    except Exception as e:
+                        print(f"Error extracting {zip_path}: {e}")
+        if 'database' in root:
+            for file in files:
+                if '._' not in file:
+                    if file.endswith('vinhistory.db'):
+                        global vinhistory_db
+                        vinhistory_db = os.path.join(root, file)
+                        print(f"VIN History DB: {vinhistory_db}")
+        if 'CloudEData' in root:
+            for file in files:
+                if file.endswith('.json'):
+                    json_path = os.path.join(root, file)
+                    json_files.append(json_path)
+                    try:
+                        with open(json_path, 'r') as json_file:
+                            print(f"Parsing {json_path}...")
+                            json_data = json_file.read()
+                            vin = extract_json_clouddata(json_data, json_path)
+                            print(f"CLOUD VIN: {vin}")
+                            
+                            if vin != "VehicleVIN not found":
+                                hit_list.append(f"VIN: {vin}, File: {json_path}")
+                    except Exception as e:
+                        print(f"Error reading {json_path}: {e}")
+
+        
+    print(f"Found {len(log_files)} log files and {len(json_files)} JSON files")
+    return log_files, json_files
+
+# Function to extract VINs
+def extract_vins(log_files, progress_bar):
+    print("Extracting VINs")
+    vins = set()
+    vin_pattern = re.compile(r'\b([A-HJ-NPR-Z0-9]{17})\b')
+    for log_file in log_files:
+        try:
+            encoding = 'ascii'
+            with open(log_file, 'r', encoding=encoding, errors='ignore') as file:
+                contents = file.read()
+                found_vins = vin_pattern.findall(contents)
+                for vin in found_vins:
+                    try:
+                        if Vin(vin).verify_checksum():
+                            if not vin.isdigit():
+                                vins.add(vin)
+                                hit_list.append(f"VIN: {vin}, File: {log_file}")
+                    except Exception as e:
+                        print(f"Error parsing VIN {vin}: {e}")
+        except Exception as e:
+            print(f"Error reading {log_file}: {e}")
+        
+    return vins
+
+# Function to extract user data
+def extract_user_data(log_files, progress_bar, total_steps):
+    global nickname, email, phone, address, city, state, country, detail_source
+    global version, Product, Sub_product, dev_serial, passwrd  # Declare as global
+
+    print("Extracting user data...")
+    nickname_regex = re.compile(r'"nickname":"(.*?)"')
+    email_regex = re.compile(r'"email":"(.*?)"')
+    phone_regex = re.compile(r'"phoneNumber":"(.*?)"')
+    address_regex = re.compile(r'"address":"(.*?)"')
+    city_regex = re.compile(r'"city":"(.*?)"')
+    state_regex = re.compile(r'"state":"(.*?)"')
+    country_regex = re.compile(r'"country":"(.*?)"')
+    version_regex = re.compile(r'OS:(\S+)')  # Renamed regex to avoid conflict
+    product_regex = re.compile(r'Product:(\S+)')
+    sub_product_regex = re.compile(r'Sub Product:(\S+)')
+    dev_serial_regex = re.compile(r'SN:(\S+)')
+    passwrd_regex = re.compile(r'PWD:(\S+)')
+
+
+
+
+    for log_file in log_files:
+        try:
+            encoding = 'ascii'
+            with open(log_file, 'r', encoding=encoding, errors='ignore') as file:
+                contents = file.read()
+                # Extract user data
+                if not nickname:
+                    nickname_match = nickname_regex.search(contents)
+                    if nickname_match:
+                        nickname = nickname_match.group(1)
+                if not email:
+                    email_match = email_regex.search(contents)
+                    if email_match:
+                        email = email_match.group(1)
+                if not phone:
+                    phone_match = phone_regex.search(contents)
+                    if phone_match:
+                        phone = phone_match.group(1)
+                if not address:
+                    address_match = address_regex.search(contents)
+                    if address_match:
+                        address = address_match.group(1)
+                if not city:
+                    city_match = city_regex.search(contents)
+                    if city_match:
+                        city = city_match.group(1)
+                if not state:
+                    state_match = state_regex.search(contents)
+                    if state_match:
+                        state = state_match.group(1)
+                if not country:
+                    country_match = country_regex.search(contents)
+                    if country_match:
+                        country = country_match.group(1)
+
+                # Extract device data
+                if not version:
+                    OS_match = version_regex.search(contents)
+                    if OS_match:
+                        version = OS_match.group(1)
+                if not Product:
+                    Product_match = product_regex.search(contents)
+                    if Product_match:
+                        Product = Product_match.group(1)
+                if not Sub_product:
+                    Sub_product_match = sub_product_regex.search(contents)
+                    if Sub_product_match:
+                        Sub_product = Sub_product_match.group(1)
+                if not dev_serial:
+                    dev_serial_match = dev_serial_regex.search(contents)
+                    if dev_serial_match:
+                        dev_serial = dev_serial_match.group(1)
+                if not passwrd:
+                    passwrd_match = passwrd_regex.search(contents)
+                    if passwrd_match:
+                        passwrd = passwrd_match.group(1)
+
+               
+        except Exception as e:
+            print(f"Error reading {log_file}: {e}")
+        
+    return nickname, email, phone, address, city, state, country, detail_source, version, Product, Sub_product, dev_serial, passwrd
+
+# Function to extract JSON data
+def extract_json_clouddata(json_data, file_path):
+    try:
+        data = json.loads(json_data)
+        vehicle_vin = data.get("VehicleVIN", None)
+        if vehicle_vin:
+            hit_list.append(f"VIN: {vehicle_vin}, File: {file_path}")
+            return vehicle_vin
+        else:
+            return "VehicleVIN not found"
+    except json.JSONDecodeError:
+        return "Invalid JSON data"
+
+# Function to extract SSIDs
+def SSID_parse(log_files):
+    ssid_info = []
+    
+    for log_file in log_files:
+        try:
+            with open(log_file, 'r', encoding='utf-8', errors='replace') as file:
+                entries = file.readlines()
+        except UnicodeDecodeError:
+            with open(log_file, 'r', encoding='latin-1') as file:
+                entries = file.readlines()
+        
+        for entry in entries:
+            if "ConnectivityService" and "CONNECTED/CONNECTED" in str(entry):
+                ips = []
+                filename_date = get_date_from_filename(log_file=log_file)
+                date_time, ssid, ip_addresses, ipv6_addresses = parse_log_for_SSID(entry)
+                date_time = filename_date + '-' + date_time
+                for ip, classification in ip_addresses.items():
+                    if classification == 'Public':
+                        ips.append(f"{ip}: {classification}")
+                    
+                for ip, classification in ipv6_addresses.items():
+                    if classification == 'Public':
+                        ips.append(f"{ip}: {classification}")
+                
+                if ssid != 'Not found' and ips != []:
+                    ssid_info.append((date_time, ssid, ips))
+                        
+    # Sort ssid_info by date_time
+    ssid_info.sort(key=lambda x: x[0])
+    ssid_info = list(set((date_time, ssid, tuple(ips)) for date_time, ssid, ips in ssid_info))    # remove duplicates
+    ssid_info = [(date_time, ssid, list(ips)) for date_time, ssid, ips in ssid_info] # Convert set to list
+
+    return ssid_info
+                                                              
+                
+def get_date_from_filename(log_file):
+    filename = os.path.basename(log_file)
+    date_parts = filename.split('_')
+    if len(date_parts) > 1:
+        date = date_parts[1]
+        year = date[:4]
+        month = date[4:6]
+        day = date[6:8]
+        
+        good_date = f"{year}"
+        return good_date
+    else:
+        return "Unknown Date"
+    
+
+def parse_log_for_SSID(log_entry):
+    # Regular expressions
+    date_time_pattern = r'\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}'
+    ssid_pattern = r'SSID: "([^"]+)"'
+    ip_pattern = r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b'
+    ipv6_pattern = r'\b(?:[a-fA-F0-9]{1,4}:){7}[a-fA-F0-9]{1,4}\b'
+
+    # Extract date and time
+    date_time_match = re.search(date_time_pattern, log_entry)
+    date_time = date_time_match.group(0) if date_time_match else "Not found"
+
+    # Extract SSID
+    ssid_match = re.search(ssid_pattern, log_entry)
+    ssid = ssid_match.group(1) if ssid_match else "Not found"
+
+    # Extract IP addresses
+    ip_matches = re.findall(ip_pattern, log_entry)
+    ipv6_matches = re.findall(ipv6_pattern, log_entry)
+    ip_addresses = {ip: classify_ip(ip) for ip in ip_matches}
+    ipv6_addresses = {ip: classify_ip(ip) for ip in ipv6_matches}
+    return  date_time,ssid,ip_addresses,ipv6_addresses
+
+def report_SSIDs(report_file, ssid_info):
+    with open(report_file, 'a') as f:
+        # f.write("\n" + "*" * 120 + "\n")
+        f.write("\nSSID Connections from Logs\n")
+        f.write("*DNS IPs may help determine ISP usage\n")
+        f.write("=" * 120 + "\n")
+        f.write(f"{'Connection Date':<25} {'SSID':<30} {'DNS IPs':<50}\n")
+        f.write("-" * 120 + "\n")
+        for date_time, ssid, ips in ssid_info:
+            f.write(f"{date_time:<25} {ssid:<30} {', '.join(ips):<50}\n")
+            print(f"Connection Date: {date_time}, SSID: {ssid}, DNS IPs: {', '.join(ips)}")
+        f.write("=" * 120 + "\n")
+# Classify IP addresses as public or private
+def classify_ip(ip):
+    try:
+        ip_obj = ip_address(ip)
+        if ip_obj.is_private:
+            return "Private"
+        else:
+            return "Public"
+    except ValueError:
+        return "Invalid"
+
+
+def format_table(column_names, results):
+    results = [[str(value) if value is not None else '' for value in row] for row in results]
+    col_widths = [max(len(str(value)) for value in col) for col in zip(*results, column_names)]
+    format_str = ' | '.join(f"{{:<{width}}}" for width in col_widths)
+    header = format_str.format(*column_names)
+    separator = '-+-'.join('-' * width for width in col_widths)
+    rows = [format_str.format(*row) for row in results]
+    table = '\n'.join([header, separator] + rows)
+    
+    return table
+
+# Function to parse VIN history database
+def parse_vinhistory_db(vinhistory_db, report_file, progress_bar):
+    if not vinhistory_db:
+        with open(report_file, 'a') as f:
+            f.write("\n" + "*" * 120 + "\n")
+            f.write("VIN History from data/media/0/Scan/database/vinhistory.db\n")
+            f.write("*Note DB used to OCR VIN Photos\n")
+            f.write("=" * 120 + "\n")
+            f.write("No vinhistory.db found.\n")
+            f.write("=" * 120 + "\n\n")
+    else:
+        try:
+            conn = sqlite3.connect(vinhistory_db)
+            c = conn.cursor()
+            c.execute("SELECT * FROM RECOG_RESULT")
+            with open(report_file, 'a') as f:
+                f.write("\n" + "*" * 120 + "\n")
+                f.write("VIN History from data/media/0/Scan/database/vinhistory.db\n")
+                f.write("*Note DB used to OCR VIN Photos\n")
+                f.write("=" * 120 + "\n")
+            column_names = [description[0] for description in c.description]
+            rows = c.fetchall()
+            table = format_table(column_names, rows)
+            conn.close()
+            with open(report_file, 'a') as f:
+                f.write(table)
+                f.write("\n" + "=" * 120 + "\n\n")
+        except sqlite3.DatabaseError as e:
+            print(f"Error {vinhistory_db}: {e}")
+            with open(report_file, 'a') as f:
+                f.write("\n" + "*" * 120 + "\n")
+                f.write("VIN History from data/media/0/Scan/database/vinhistory.db\n")
+                f.write("*Note DB used to OCR VIN Photos\n")
+                f.write("=" * 120 + "\n")
+                f.write("Error: The file is not a valid SQLite database.\n")
+                f.write("=" * 120 + "\n\n")
+            print(f"Error connecting to vinhistory.db: {e}")
+        except Exception as e:
+            with open(report_file, 'a') as f:
+                f.write("\n" + "*" * 120 + "\n")
+                f.write("VIN History from data/media/0/Scan/database/vinhistory.db\n")
+                f.write("*Note DB used to OCR VIN Photos\n")
+                f.write("=" * 120 + "\n")
+                f.write(f"Error: {e}\n")
+                f.write("=" * 120 + "\n\n")
+            print(f"Error connecting to vinhistory.db: {e}")
+
+# Function to make report header
+def make_report_header(reportfile, nickname, email, phone, address, city, state, country, detail_source, version, Product, Sub_product, dev_serial, passwrd):
+    if len(nickname) == 0 and len(email) == 0 and len(phone) == 0 and len(address) == 0 and len(city) == 0 and len(state) == 0 and len(country) == 0:
+        with open(reportfile, 'w') as f:
+            f.write(f"KeyProgrammerParser Report\nDate: {now.strftime('%Y-%m-%d %H:%M:%S')}\n\n\n")
+            f.write("Device Information:\n\n")
+            f.write(f"\tOS: {version}\n")
+            f.write(f"\tProduct: {Product}\n")
+            f.write(f"\tSub Product: {Sub_product}\n")
+            f.write(f"\tSerial Number: {dev_serial}\n")
+            f.write(f"\tPassword: {passwrd}\n\n")
+            f.write("User Information: No Registered User Found\n\n")
+    else:
+        with open(reportfile, 'w') as f:
+            f.write(f"KeyProgrammerParser Report\nDate: {now.strftime('%Y-%m-%d %H:%M:%S')}\n\n\n")
+            f.write("Device Information:\n\n")
+            f.write(f"\tOS: {version}\n")
+            f.write(f"\tProduct: {Product}\n")
+            f.write(f"\tSub Product: {Sub_product}\n")
+            f.write(f"\tSerial Number: {dev_serial}\n")
+            f.write(f"\tPassword: {passwrd}\n\n")
+           
+     
+            f.write("User Information:\n\n")
+            f.write(f"\tNickname: {nickname}\n")
+            f.write(f"\tEmail: {email}\n")
+            f.write(f"\tPhone: {phone}\n")
+            f.write(f"\tAddress: {address}\n")
+            f.write(f"\tCity: {city}\n")
+            f.write(f"\tState: {state}\n")
+            f.write(f"\tCountry: {country}\n")
+            f.write(f"\tSource File: {detail_source}\n\n")
+
+# Function to lookup and report VINs
+def lookup_and_report_vins(vins, json_files, reportfile):
+    # Extract VINs from JSON files
+    for json_file in json_files:
+        try:
+            with open(json_file, 'r') as file:
+                json_data = file.read()
+                vin = extract_json_clouddata(json_data, json_file)
+                if vin != "VehicleVIN not found":
+                    vins.add(vin)
+        except Exception as e:
+            print(f"Error reading {json_file}: {e}")
+
+    # Write VIN summary to the report file
+    with open(reportfile, 'a') as f:
+        # f.write("\n" + "*" * 120 + "\n")
+        f.write("VIN Summary\n")
+        f.write("=" * 120 + "\n")
+        f.write(f"{'VIN':<20} {'Make':<15} {'Model':<15} {'Trim':<10} {'Year':<5} {'Type':<15}\n")
+        f.write("-" * 120 + "\n")
+
+    print(f"Extracted {len(vins)} VINs")
+    for vin in vins:
+        try:
+            vehicle = pyvin.VIN(vin)
+            with open(reportfile, 'a') as f:
+                f.write(f"{vin:<20} {vehicle.Make:<15} {vehicle.Model:<15} {vehicle.Trim:<10} {vehicle.ModelYear:<5} {vehicle.VehicleType:<15}\n")
+            print(f"VIN: {vin} Make: {vehicle.Make} Model: {vehicle.Model} {vehicle.Trim} Year: {vehicle.ModelYear} Type: {vehicle.VehicleType}")
+        except Exception as e:
+            vin_info = Vin(vin)
+            with open(reportfile, 'a') as f:
+                f.write(f"{vin:<20} {'N/A':<15} {'N/A':<15} {'N/A':<10} {'N/A':<5} {'N/A':<15} Annot: {vin_info.annotate()}\n")
+            print(f"VIN: {vin} Annot: {vin_info.annotate()}")
+
+    with open(reportfile, 'a') as f:
+        f.write("=" * 120 + "\n")
+        
+def report_sources(hit_list, reportfile):
+    try:
+        with open(reportfile, 'a') as f:
+            # f.write("\n" + "*" * 120 + "\n")
+            f.write("\nSources\n")
+            f.write("=" * 120 + "\n")
+            set_hit_list = set(hit_list)
+            sorted_hit_list = sorted(set_hit_list)
+            for hit in sorted_hit_list:
+                f.write(f"{hit}\n\n")
+            f.write("=" * 120 + "\n\n")
+    except Exception as e:
+        print("Report Sources Error:", e)
+
+# Function to run parser
+def run_parser(input_path, report_file, progress_bar):
+
+    global jpgs, vinhistory_db
+    jpgs = []
+
+    # Check if the input path is a zip file or a directory
+    if zipfile.is_zipfile(input_path):
+        # Create a temporary directory to extract the zip file
+        temp_dir = tempfile.mkdtemp()
+        try:
+            print(f"Extracting ZIP {input_path} to {temp_dir}")
+            with zipfile.ZipFile(input_path, 'r') as zip_ref:
+                zip_ref.extractall(temp_dir)
+            base_directory = temp_dir
+        except Exception as e:
+            print(f"Error extracting {input_path}: {e}")
+            shutil.rmtree(temp_dir)
+            return
+    else:
+        base_directory = input_path
+
+    log_files, json_files = find_log_files(base_directory)
+    total_steps = len(log_files)
+    progress_bar.set(0)  # Reset to 0 before starting
+    progress_bar.max = total_steps  # Set the max directly
+    # progress_bar.configure(maximum=total_steps)
+    find_scan_jpegs(base_directory, progress_bar)
+    copy_jpegs(jpgs, os.path.join(base_directory, 'Reports'), progress_bar)
+    # print("Log files found: ", len(log_files))
+    vins = extract_vins(log_files, progress_bar)
+    extract_user_data(log_files, progress_bar, total_steps)
+    ssid_info = SSID_parse(log_files)
+    make_report_header(report_file, nickname, email, phone, address, city, state, country, detail_source, version, Product, Sub_product, dev_serial, passwrd)
+    lookup_and_report_vins(vins, json_files, report_file)
+    parse_vinhistory_db(vinhistory_db, report_file, progress_bar)
+    report_SSIDs(report_file, ssid_info)
+    report_sources(hit_list, report_file)
+    progress_bar.set(100)
+    if zipfile.is_zipfile(input_path):
+        shutil.rmtree(temp_dir)
+  
+# GUI functionality
+# def select_directory():
+#     directory = ctk.filedialog.askdirectory()
+#     directory_entry.delete(0, ctk.END)
+#     directory_entry.insert(0, directory)
+
+# Function to run parser in a thread
+def run_in_thread(base_directory, report_file, progress_bar):
+    try:
+        run_parser(base_directory, report_file, progress_bar)
+    finally:
+        root.after(0, on_thread_complete(report_file))
+
+# Function to handle thread completion
+def on_thread_complete(report_file):
+    progress_bar.stop()
+    tkMessageBox.showinfo("Processing Completed", "Report written to " + report_file)
+    start_button.configure(state=ctk.NORMAL)
+
+# GUI functionality
+def select_directory():
+    # Allow the user to select either a directory or a zip file
+    input_path = filedialog.askopenfilename(
+        title="Select Directory or Zip File",
+        filetypes=[("All Files", "*.*"), ("Zip Files", "*.zip")]
+    )
+    directory_entry.delete(0, ctk.END)
+    directory_entry.insert(0, input_path)
+
+def select_report_file():
+    report_file = filedialog.asksaveasfilename(
+        defaultextension=".txt",
+        filetypes=[("Text files", "*.txt")]
+    )
+    report_file_entry.delete(0, ctk.END)
+    report_file_entry.insert(0, report_file)
+
+def validate_inputs(base_directory, report_file):
+    if not base_directory or not os.path.exists(base_directory):
+        tkMessageBox.showerror("Error", "Invalid base directory. Please select a valid directory or zip file.")
+        return False
+    if not report_file:
+        tkMessageBox.showerror("Error", "Invalid report file. Please select a valid report file.")
+        return False
+    return True
+
+def start_parsing():
+    base_directory = directory_entry.get()
+    report_file = report_file_entry.get()
+    if validate_inputs(base_directory, report_file):
+        progress_bar.set(0)
+        progress_bar.start()
+        # Start the parsing in a new thread
+        threading.Thread(target=run_in_thread, args=(base_directory, report_file, progress_bar)).start()
+        start_button.configure(state=ctk.DISABLED)
+
+# Redirect stdout and stderr to the console
+class ConsoleLogger:
+    def __init__(self, text_widget):
+        self.text_widget = text_widget
+
+    def write(self, message):
+        self.text_widget.insert(ctk.END, message)
+        self.text_widget.see(ctk.END)
+
+    def flush(self):
+        pass
+
+# GUI setup
+ctk.set_appearance_mode("System")  # Modes: "System" (default), "Dark", "Light"
+ctk.set_default_color_theme("blue")  # Themes: "blue" (default), "green", "dark-blue", etc.
+
+root = ctk.CTk()
+root.title("KeyProgrammerParser v2.2")
+root.geometry("840x620")
+
+# Styling
+label_font = ('Arial', 12)
+
+# Frame for directory selection
+directory_frame = ctk.CTkFrame(root)
+directory_frame.pack(pady=10)
+
+directory_label = ctk.CTkLabel(directory_frame, text="Folder of ZIP containing extraction:", font=label_font)
+directory_label.pack(side=ctk.LEFT)
+
+directory_entry = ctk.CTkEntry(directory_frame, width=400)
+directory_entry.pack(side=ctk.LEFT, padx=5)
+
+directory_button = ctk.CTkButton(directory_frame, text="Browse", command=select_directory)
+directory_button.pack(side=ctk.LEFT)
+
+# Frame for report file selection
+report_frame = ctk.CTkFrame(root)
+report_frame.pack(pady=10)
+
+report_file_label = ctk.CTkLabel(report_frame, text="Select report file:", font=label_font)
+report_file_label.pack(side=ctk.LEFT)
+
+report_file_entry = ctk.CTkEntry(report_frame, width=400)
+report_file_entry.pack(side=ctk.LEFT, padx=5)
+
+report_file_button = ctk.CTkButton(report_frame, text="Save As", command=select_report_file)
+report_file_button.pack(side=ctk.LEFT)
+
+# Progress bar
+progress_bar = ctk.CTkProgressBar(root, width=400, mode='determinate')  # Set mode to 'determinate'
+progress_bar.pack(pady=10)  # Ensure it's visible
+progress_bar.set(0)  # Reset to 0 before starting
+
+
+# Start button
+start_button = ctk.CTkButton(root, text="Start Parsing", command=start_parsing)
+start_button.pack(pady=10)
+
+# Console output
+console_frame = ctk.CTkFrame(root)
+console_frame.pack(pady=10)
+
+console_label = ctk.CTkLabel(console_frame, text="", font=label_font)
+console_label.pack()
+
+console_text = ScrolledText(console_frame, height=50, width=200, bg='#ffffff', font=('Arial', 10))
+console_text.pack()
+
+# Redirect stdout and stderr to the console
+console_logger = ConsoleLogger(console_text)
+sys.stdout = console_logger
+sys.stderr = console_logger
+
+# Start the main loop
+root.mainloop()
