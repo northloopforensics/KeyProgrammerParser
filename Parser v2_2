@@ -499,7 +499,6 @@ def report_sources(hit_list, reportfile):
 
 # Function to run parser
 def run_parser(input_path, report_file, progress_bar):
-
     global jpgs, vinhistory_db
     jpgs = []
 
@@ -508,7 +507,7 @@ def run_parser(input_path, report_file, progress_bar):
         # Create a temporary directory to extract the zip file
         temp_dir = tempfile.mkdtemp()
         try:
-            print(f"Extracting ZIP {input_path} to {temp_dir}")
+            print(f"Extracting {input_path} to {temp_dir}")
             with zipfile.ZipFile(input_path, 'r') as zip_ref:
                 zip_ref.extractall(temp_dir)
             base_directory = temp_dir
@@ -539,18 +538,14 @@ def run_parser(input_path, report_file, progress_bar):
     if zipfile.is_zipfile(input_path):
         shutil.rmtree(temp_dir)
   
-# GUI functionality
-# def select_directory():
-#     directory = ctk.filedialog.askdirectory()
-#     directory_entry.delete(0, ctk.END)
-#     directory_entry.insert(0, directory)
+
 
 # Function to run parser in a thread
 def run_in_thread(base_directory, report_file, progress_bar):
     try:
         run_parser(base_directory, report_file, progress_bar)
     finally:
-        root.after(0, on_thread_complete(report_file))
+        root.after(0, lambda: on_thread_complete(report_file))
 
 # Function to handle thread completion
 def on_thread_complete(report_file):
@@ -559,12 +554,39 @@ def on_thread_complete(report_file):
     start_button.configure(state=ctk.NORMAL)
 
 # GUI functionality
+def show_help():
+    help_text = textwrap.dedent("""
+    KeyProgrammerParser v2.2
+    -------------------------
+    This tool parses log files, JSON files, and VIN history databases to extract VIN and user data from Autel KM100x devices.
+    
+    Instructions:
+    1. Select the input type (Zip File or Folder).
+    2. Browse to the input directory or zip file.
+    3. Browse to the report file location.
+    4. Click the "Start Parsing" button to begin.
+    
+    Results:
+    - VINs extracted from log files and JSON files. If online,lookup details are collected from the US NHTSA VIN database.
+    - User data is extracted from log files.
+    - vinhistory.db database is related to photo OCR services found on some units.
+    - SSID connections extracted from log files. DNS IPs may help determine ISP usage. IP lookup will help determine service providers.
+    - Sources of VINs and other data extracted are listed for reference.
+
+    Note: Normal forensic practices should be followed when handling evidence. Verify timestamps and integrity of the data.
+    """)
+    tkMessageBox.showinfo("Help", help_text)
+    
 def select_directory():
-    # Allow the user to select either a directory or a zip file
-    input_path = filedialog.askopenfilename(
-        title="Select Directory or Zip File",
-        filetypes=[("All Files", "*.*"), ("Zip Files", "*.zip")]
-    )
+    if input_type.get() == "zip":
+        input_path = filedialog.askopenfilename(
+            title="Select Zip File",
+            filetypes=[("Zip Files", "*.zip")]
+        )
+    else:
+        input_path = filedialog.askdirectory(
+            title="Select Directory"
+        )
     directory_entry.delete(0, ctk.END)
     directory_entry.insert(0, input_path)
 
@@ -618,11 +640,24 @@ root.geometry("840x620")
 # Styling
 label_font = ('Arial', 12)
 
+## Frame for input type selection
+input_type_frame = ctk.CTkFrame(root)
+input_type_frame.pack(pady=10)
+
+input_type_label = ctk.CTkLabel(input_type_frame, text="Select input type:", font=label_font)
+input_type_label.pack(side=ctk.LEFT)
+
+input_type = ctk.StringVar(value="zip")
+zip_radio = ctk.CTkRadioButton(input_type_frame, text="Zip File", variable=input_type, value="zip")
+zip_radio.pack(side=ctk.LEFT, padx=5)
+folder_radio = ctk.CTkRadioButton(input_type_frame, text="Folder", variable=input_type, value="folder")
+folder_radio.pack(side=ctk.LEFT, padx=5)
+
 # Frame for directory selection
 directory_frame = ctk.CTkFrame(root)
 directory_frame.pack(pady=10)
 
-directory_label = ctk.CTkLabel(directory_frame, text="Folder of ZIP containing extraction:", font=label_font)
+directory_label = ctk.CTkLabel(directory_frame, text="Path to Input:", font=label_font)
 directory_label.pack(side=ctk.LEFT)
 
 directory_entry = ctk.CTkEntry(directory_frame, width=400)
@@ -641,11 +676,11 @@ report_file_label.pack(side=ctk.LEFT)
 report_file_entry = ctk.CTkEntry(report_frame, width=400)
 report_file_entry.pack(side=ctk.LEFT, padx=5)
 
-report_file_button = ctk.CTkButton(report_frame, text="Save As", command=select_report_file)
+report_file_button = ctk.CTkButton(report_frame, text="Browse", command=select_report_file)
 report_file_button.pack(side=ctk.LEFT)
 
 # Progress bar
-progress_bar = ctk.CTkProgressBar(root, width=400, mode='determinate')  # Set mode to 'determinate'
+progress_bar = ctk.CTkProgressBar(root, width=700, mode='determinate')  # Set mode to 'determinate'
 progress_bar.pack(pady=10)  # Ensure it's visible
 progress_bar.set(0)  # Reset to 0 before starting
 
@@ -654,9 +689,18 @@ progress_bar.set(0)  # Reset to 0 before starting
 start_button = ctk.CTkButton(root, text="Start Parsing", command=start_parsing)
 start_button.pack(pady=10)
 
+# Help button
+
+help_frame = ctk.CTkFrame(root)
+help_frame.pack(side=ctk.BOTTOM, anchor=ctk.E, pady=5, padx=5)
+
+# Create the help button with smaller font and less prominent color
+help_button = ctk.CTkButton(help_frame, text="?", command=show_help, font=("Arial", 10), fg_color="gray")
+help_button.pack()
+
 # Console output
 console_frame = ctk.CTkFrame(root)
-console_frame.pack(pady=10)
+console_frame.pack(pady=1)
 
 console_label = ctk.CTkLabel(console_frame, text="", font=label_font)
 console_label.pack()
