@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>KeyProgrammerParser Report</title>
+    <!-- DataTables CSS -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css">
+    <!-- DataTables Buttons CSS -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.3.6/css/buttons.bootstrap5.min.css">
+    <!-- Include Bootswatch Darkly Theme -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootswatch@5.3.0/dist/darkly/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+
+    <!-- Include Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
+    <!-- Include Font Awesome -->
+    <script src="https://kit.fontawesome.com/your-kit-code.js" crossorigin="anonymous"></script>
+
+    <style>
+        body {
+            overflow-x: hidden;
+            margin: 0;
+            font-family: 'Roboto', sans-serif;
+            display: flex;
+        }
+        .sidebar {
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            width: 250px;
+            background-color: #343a40;
+            padding: 1rem;
+            color: #fff;
+            overflow-y: auto;
+        }
+        .main-content {
+            margin-left: 250px;
+            width: calc(100% - 250px);
+            padding: 1rem;
+        }
+        h1, h2, h3, h4, h5 {
+            margin-top: 1rem;
+        }
+    </style>
+</head>
+<body>
+
+<div class="sidebar">
+    <h2>Key Programmer Parser</h2>
+    <ul class="nav flex-column">
+        <li class="nav-item mb-2"><a class="nav-link text-white" href="#user-section">Device</a></li>
+        <li class="nav-item mb-2"><a class="nav-link text-white" href="#vin-section">VINs</a></li>
+        <li class="nav-item mb-2"><a class="nav-link text-white" href="#ssid-section">WiFi Data</a></li>
+        <li class="nav-item mb-2"><a class="nav-link text-white" href="#sources-section">Sources</a></li>
+        <!-- Add more nav links as needed -->
+    </ul>
+</div>
+
+<div class="main-content">
+    <!-- Header Section -->
+    <header class="mb-4">
+        <p>Date Generated: {{ current_date }}</p>
+        <!-- Additional case info fields if needed -->
+    </header>
+
+    <!-- User Data Section -->
+    <section id="user-section" class="mb-5">
+        <h2>Device Info</h2>
+        <table class="table table-striped table-bordered">
+            <tbody>
+                <tr>
+                    <th>OS</th>
+                    <td>{{ version }}</td>
+                </tr>
+                <tr>
+                    <th>Product</th>
+                    <td>{{ Product }}</td>
+                </tr>
+                <tr>
+                    <th>Sub Product</th>
+                    <td>{{ Sub_product }}</td>
+                </tr>
+                <tr>
+                    <th>Serial Number</th>
+                    <td>{{ dev_serial }}</td>
+                </tr>
+                <tr>
+                    <th>Password</th>
+                    <td>{{ passwrd }}</td>
+                </tr>
+            </tbody>
+        </table>
+        <h2>User Data</h2>
+        <table class="table table-striped table-bordered">
+            <tbody>
+                <tr>
+                    <th>Nickname</th>
+                    <td>{{ nickname }}</td>
+                </tr>
+                <tr>
+                    <th>Email</th>
+                    <td>{{ email }}</td>
+                </tr>
+                <tr>
+                    <th>Phone</th>
+                    <td>{{ phone }}</td>
+                </tr>
+                <tr>
+                    <th>Address</th>
+                    <td>{{ address }}</td>
+                </tr>
+                <tr>
+                    <th>City</th>
+                    <td>{{ city }}</td>
+                </tr>
+                <tr>
+                    <th>State</th>
+                    <td>{{ state }}</td>
+                </tr>
+                <tr>
+                    <th>Country</th>
+                    <td>{{ country }}</td>
+                </tr>
+                <tr>
+                    <th>Source File</th>
+                    <td>{{ detail_source }}</td>
+                </tr>
+            </tbody>
+        </table>
+        
+    </section>
+
+ <!-- VIN Lookups Section -->
+    <section id="vin-section" class="mb-5">
+    <h2>VIN Data</h2>
+    <p>Consolidated list of VINs collected from parsed artifacts. Detailed vehicle infomation sourced from NHTSA</p>
+        <table id="vinLookupsTable" class="table table-striped table-bordered">
+            <thead>
+                <tr>
+                    <th>VIN</th>
+                    <th>Make</th>
+                    <th>Model</th>
+                    <th>Trim</th>
+                    <th>Year</th>
+                    <th>Type</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in vin_lookups %}
+                <tr>
+                    <td>{{ item['VIN'] }}</td>
+                    <td>{{ item['Make'] }}</td>
+                    <td>{{ item['Model'] }}</td>
+                    <td>{{ item['Trim'] }}</td>
+                    <td>{{ item['Year'] }}</td>
+                    <td>{{ item['Type'] }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+    <!-- SSID Data Section -->
+    <section id="ssid-section" class="mb-5">
+        <h2>WiFi Data</h2>
+        <p>WiFi network connections. DNS IPs may be useful in determining internet service providers.</p>
+
+        <table id="ssidTable" class="table table-striped table-bordered">
+            <thead>
+                <tr>
+                    <th>Connection Date</th>
+                    <th>SSID</th>
+                    <th>DNS IPs</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in ssid %}
+                <tr>
+                    <td>{{ item['Connection Date'] }}</td>
+                    <td>{{ item['SSID'] }}</td>
+                    <td>{{ item['DNS IPs'] }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+   {% if VeH_data %}
+    <!-- Vehicle DB Section -->
+    <section id="ssid-section" class="mb-5">
+        <h2>VehicleHistory.db Data</h2>
+        <table id="veHTable" class="table table-striped table-bordered">
+            <thead>
+                <tr>
+                    <th>VIN</th>
+                    <th>Year</th>
+                    <th>Make</th>
+                    <th>Model</th>
+                    <th>Date Last Used - UTC</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in VeH_data %}
+                <tr>
+                    <td>{{ item['vin_code'] }}</td>
+                    <td>{{ item['year'] }}</td>
+                    <td>{{ item['make'] }}</td>
+                    <td>{{ item['model'] }}</td>
+                    <td>{{ item['last_use_time'] }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+    {% endif %}
+    <!-- Sources Section -->
+    <section id="sources-section" class="mb-5">
+        <h2>Sources</h2>
+        <ul>
+            {% for source in sources %}
+            <li>{{ source }}</li>
+            {% endfor %}
+        </ul>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer mt-auto py-3 bg-dark text-white">
+        
+        <div class="container text-center">
+            <span>Created with <strong>KeyProgrammerParser v3.0</strong> from <a href="https://northloopconsulting.com" target="_blank" class="text-white">North Loop Consulting, LLC</a></span>
+            <br>
+            <span>&copy; 2025 North Loop Consulting, LLC. All rights reserved.</span>
+        </div>
+
+    </footer>
+</div>
+
+<!-- DataTables JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.3.6/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.3.6/js/buttons.bootstrap5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.3.6/js/buttons.html5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.3.6/js/buttons.print.min.js"></script>
+
+<script>
+    $(document).ready(function() {
+        $('#vinTable').DataTable({
+            dom: 'Bfrtip',
+            buttons: [
+                'copy', 'csv', 'excel', 'pdf', 'print'
+            ]
+        });
+        $('#ssidTable').DataTable({
+            dom: 'Bfrtip',
+            buttons: [
+                'copy', 'csv', 'excel', 'pdf', 'print'
+            ]
+        });
+    });
+</script>
+
+</body>
+</html>
