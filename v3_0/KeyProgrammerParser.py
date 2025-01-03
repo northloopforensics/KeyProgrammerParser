@@ -47,7 +47,23 @@ Product = ""
 Sub_product = ""
 dev_serial = ""
 passwrd = ""
-template_path = '/Users/nlc/Downloads/report_template.html'
+
+def get_resource_path(relative_path):
+    """ Get the absolute path to the resource, works for dev and for PyInstaller """
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
+
+# Path to the template
+template_path = get_resource_path('report_template.html')
+# Check if the template file exists
+if not os.path.exists(template_path):
+    raise FileNotFoundError(f"Template file not found at {template_path}")
+
 # Function to detect operating system
 def detect_operating_system():
     os_name = os.name
@@ -383,37 +399,41 @@ def format_table(column_names, results):
 def parse_vinhistory_db(vinhistory_db, report_file, progress_bar):
     df = pd.DataFrame()  
     db_vins = []
-    try:
-        conn = sqlite3.connect(vinhistory_db)
-        c = conn.cursor()
-        c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='RECOG_RESULT'")
-        if not c.fetchone():
-            print(f"Error: Table 'RECOG_RESULT' does not exist in {vinhistory_db}")
+
+    if not vinhistory_db:
+        return db_vins, df
+    else:
+        try:
+            conn = sqlite3.connect(vinhistory_db)
+            c = conn.cursor()
+            c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='RECOG_RESULT'")
+            if not c.fetchone():
+                print(f"vinhistory.db not located in data set.")
+                return db_vins, df
+
+            c.execute("SELECT * FROM RECOG_RESULT")
+            column_names = [description[0] for description in c.description]
+            rows = c.fetchall()
+            table = format_table(column_names, rows)
+            # Keep track of VINs
+            unique_vin_codes = [str(row[0]) for row in rows if row[0] and len(str(row[0])) == 17]
+            for vin in unique_vin_codes:
+                hit_list.append(f"VIN: {vin}, File: {vinhistory_db}")
+                db_vins.append(vin)
+            conn.close()
+
+            # Convert query results into a DataFrame
+            df = pd.DataFrame(rows, columns=column_names)
+
             return db_vins, df
 
-        c.execute("SELECT * FROM RECOG_RESULT")
-        column_names = [description[0] for description in c.description]
-        rows = c.fetchall()
-        table = format_table(column_names, rows)
-        # Keep track of VINs
-        unique_vin_codes = [row[0] for row in rows if row[0]]
-        for vin in unique_vin_codes:
-            hit_list.append(f"VIN: {vin}, File: {vinhistory_db}")
-            db_vins.append(vin)
-        conn.close()
-
-        # Convert query results into a DataFrame
-        df = pd.DataFrame(rows, columns=column_names)
-
-        return db_vins, df
-
-    except sqlite3.DatabaseError as e:
-        print(f"Error {vinhistory_db}: {e}")
-        print(f"Error connecting to vinhistory.db: {e}")
-        return db_vins, df
-    except Exception as e:
-        print(f"Error connecting to vinhistory.db: {e}")
-        return db_vins, df
+        except sqlite3.DatabaseError as e:
+            print(f"Error {vinhistory_db}: {e}")
+            print(f"Error connecting to vinhistory.db: {e}")
+            return db_vins, df
+        except Exception as e:
+            print(f"Error connecting to vinhistory.db: {e}")
+            return db_vins, df
 
 # Function to parse vehicle history database
 def parse_vehiclehistory_db(vehiclehistory_db, report_file, progress_bar):
@@ -442,7 +462,7 @@ def parse_vehiclehistory_db(vehiclehistory_db, report_file, progress_bar):
             rows = c.fetchall()
 
             # Keep track of VINs
-            unique_vin_codes = [row[0] for row in rows if row[0]]
+            unique_vin_codes = [str(row[0]) for row in rows if row[0] and len(str(row[0])) == 17]
             for vin in unique_vin_codes:
                 hit_list.append(f"VIN: {vin}, File: {vehiclehistory_db}")
                 db_vins.append(vin)
