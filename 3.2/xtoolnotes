@@ -1,0 +1,9 @@
+\EXTRACTION_FFS 01\EXTRACTION_FFS\Dump\data\data\com.xtooltech.D7\databases\main.db"
+diag_report table holds the data
+Diagnosis database containing historical vehicle data. Contains pointers to log files for vehicle
+
+Path to log example:
+/storage/emulated/0/Android/data/com.xtooltech.D7/files/Diagnosis/traces/PS_USAFORD-V15.80/240906042144.log
+
+"E:\KeyProgrammer\XTool D7\UFED XTOOL P700 2025_03_19 (001)\EXTRACTION_FFS 01\EXTRACTION_FFS\Dump\data\data\com.xtooltech.D7\files\location.txt"
+file has a location date and time
