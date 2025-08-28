@@ -1,6 +1,6 @@
 # KeyProgrammerParser
 
-Currently Supports - Autel KM100, MX808, and IM508
+Currently Supports - Autel KM100, MX808, IM508 and XTool D7, AutoProPad
 
 The tool ingests the full file system as a folder.  The first step to process the extraction is to unzip the full file system extraction to a folder on your computer. 
 
