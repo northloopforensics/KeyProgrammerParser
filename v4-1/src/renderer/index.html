@@ -1,0 +1,140 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>KeyProgrammer Parser v4.1</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <img src="../digital-key.png" alt="logo" class="logo" onerror="this.style.display='none'" />
+        <h1>KeyProgrammer Parser</h1>
+        <p class="subtitle">Version 4.1 supports Autel KM100, IM508, MX808 and XTool D7, AutoPadPro</p>
+      </header>
+
+      <div class="layout">
+        <aside class="sidebar">
+          <div class="panel-controls">
+            <h3>Inputs & Controls</h3>
+            <div class="row">
+              <label>Input Type</label>
+              <div class="radio-group">
+                <label><input type="radio" name="inputType" value="zip" checked> Zip File</label>
+                <label><input type="radio" name="inputType" value="folder"> Folder</label>
+              </div>
+            </div>
+
+            <div class="row">
+              <label for="inputPath">Input</label>
+              <input id="inputPath" type="text" readonly />
+              <button id="browseInput">Browse</button>
+            </div>
+
+            <div class="row">
+              <label for="reportPath">Report Folder</label>
+              <input id="reportPath" type="text" readonly />
+              <button id="browseReport">Browse</button>
+            </div>
+
+            <div class="row actions">
+              <div style="display:flex;align-items:center;gap:8px">
+                <button id="startBtn" class="primary">Start Parsing</button>
+                <!-- small activity spinner shown while work is running -->
+                <div id="spinner" class="spinner" aria-hidden="true" title="Working"></div>
+              </div>
+              <button id="helpBtn" class="secondary">Help</button>
+            </div>
+          </div>
+        </aside>
+
+        <main class="content">
+          <div class="single-panel">
+            <div class="output-card">
+              <div class="output-header">
+                <div class="title">Status</div>
+                <div class="meta">Live • <span id="outputMeta">idle</span></div>
+              </div>
+
+              <div class="row" style="margin-top:10px">
+                <progress id="progress" value="0" max="100" style="width:100%"></progress>
+              </div>
+
+              <!-- current action text only -->
+              <div id="currentAction" class="current-action" aria-live="polite">Waiting to start...</div>
+
+              <!-- report preview appears below the current action -->
+              <div class="report-card" style="margin-top:12px; flex:1; display:flex; flex-direction:column; min-height:0;">
+                <div class="report-header"><div class="title">Report Preview</div></div>
+                <iframe id="reportIframe" class="report-iframe" sandbox="allow-same-origin allow-scripts"></iframe>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+
+  <!-- console is shown in the Output tab above -->
+
+      <footer>
+        <small>Copyright 2025 North Loop Consulting, LLC. All rights reserved.</small>
+      </footer>
+    </div>
+
+    <script src="renderer.js"></script>
+    <!-- Help modal -->
+    <div id="helpModal" class="modal" aria-hidden="true">
+      <div class="modal-backdrop" id="modalBackdrop"></div>
+      <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+        <header class="modal-header">
+          <h3 id="helpTitle">About KeyProgrammer Parser</h3>
+          <button id="closeHelp" class="modal-close">✕</button>
+        </header>
+        <div class="modal-body">
+          <h4>Supported devices</h4>
+          <p>The parser works with device full file system extractions made by your favorite extraction tools. Supported device families include:</p>
+          <ul>
+            <li>Autel: KM100, IM508, MX808 (MaxiIM/MaxiSys style exports)</li>
+            <li>XTool: D7 and related AutoPad/AutoPadPro exports</li>
+            <li>Other devices using similar file structures may also work</li>
+          </ul>
+
+          <h4>How to use</h4>
+          <ol>
+            <li>Choose Input Type: "Zip File" or "Folder".</li>
+            <li>Browse and select the input file or folder containing the device extraction.</li>
+            <li>Select a folder where the HTML report should be saved (choose a drive with free space because a temp folder may also be placed here).</li>
+            <li>Click "Start Parsing" — progress appears in the bar and a short status message is shown. When finished the report preview will load and an "Open report" button will become available.</li>
+          </ol>
+
+          <h4>What the report contains</h4>
+          <p>The generated HTML report summarizes the key findings so you can quickly review evidence:</p>
+          <ul>
+            <li>Extracted VINs and any matching vehicle metadata</li>
+            <li>Discovered Wi‑Fi networks and saved credentials (when present)</li>
+            <li>Detected key/key‑programming records and transponder information</li>
+            <li>Relevant log excerpts, timestamps and source file locations</li>
+          </ul>
+
+          <h4>Quick troubleshooting</h4>
+          <ul>
+            <li>If the report does not appear: check the final status line for errors and confirm the chosen report folder exists and has free space.</li>
+            <li>If extraction fails with "No space left on device": pick a report folder on a different drive with more free space and try again.</li>
+            <li>If the app reports files locked during cleanup, the report will still be written — try opening it from the report folder or use the "Open report" button in the app.</li>
+            <li>If the parser finds unexpected or incomplete results, attach the generated HTML report and a short description when requesting support (see contact details below).</li>
+          </ul>
+
+          <h4>Privacy & file handling</h4>
+          <p>All processing is local. The app writes a single HTML report into the folder you choose. If you are online, VIN look ups will be performed through an API with NHTSA. Temporary extraction folders are removed when possible; if a temp folder remains it can be safely deleted later.</p>
+
+          <h4>Need help?</h4>
+          <p>Contact us at northloopconsulting.com.</p>
+        </div>
+        <footer class="modal-footer">
+          <button id="closeHelp2" class="primary">Close</button>
+        </footer>
+      </div>
+    </div>
+  </body>
+</html>
